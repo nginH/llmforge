@@ -1,12 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2018",
     "module": "commonjs",
     "outDir": "dist/cjs",
     "declaration": true,
     "declarationDir": "dist/cjs",
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": false,
+    "lib": ["es2018", "dom"],
+    "types": ["node"]
   },
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 } 

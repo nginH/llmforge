@@ -11,7 +11,7 @@
     // "disableReferencedProjectLoad": true,
 
     /* Language and Environment */
-    "target": "es2022",
+    "target": "es2018",
 
     /* Modules */
     "module": "commonjs",
@@ -23,7 +23,8 @@
     },
     // "rootDirs": [],
     // "typeRoots": [],
-    // "types": [],
+    "lib": ["es2018", "dom"],
+    "types": ["node"],
     // "allowUmdGlobalAccess": true,
     // "moduleSuffixes": [],
     // "allowImportingTsExtensions": true,
