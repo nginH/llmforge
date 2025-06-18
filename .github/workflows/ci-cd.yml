@@ -54,7 +54,6 @@ jobs:
       with:
         node-version: '22.10.0'
         registry-url: 'https://npm.pkg.github.com'
-        scope: '@nginh'
 
     - name: Publish to GitHub Packages
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -62,5 +61,5 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
         echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-        echo "@nginh:registry=https://npm.pkg.github.com" >> .npmrc
+        echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
         npm publish --registry=https://npm.pkg.github.com 
