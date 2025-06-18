@@ -27,17 +27,12 @@ npm install @nginh/llmforge@1.0.0
 ```typescript
 import { RunnerClient } from 'llmforge';
 
-const config = {
+const openaiConfig = {
    llmConfig: {
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY || '',
       provider: 'openai',
       model: 'gpt-3.5-turbo',
-      generationConfig: {
-         temperature: 0.7,
-         maxOutputTokens: 150,
-      },
    },
-   enableFallback: false,
 };
 
 const client = await RunnerClient.create(config);

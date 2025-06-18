@@ -17,16 +17,7 @@ async function testOpenAI() {
          apiKey: process.env.OPENAI_API_KEY || '',
          provider: 'openai',
          model: 'gpt-3.5-turbo',
-         generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 150,
-         },
-         retryConfig: {
-            maxRetries: 3,
-            retryDelay: 1000,
-         },
       },
-      enableFallback: false,
    };
 
    try {
