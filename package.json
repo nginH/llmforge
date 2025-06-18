@@ -38,7 +38,9 @@
   "homepage": "https://github.com/nginH/llmforge#readme",
   "dependencies": {
     "axios": "^1.6.7",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "undici": "^7.10.0",
+    "undici-types": "^7.10.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
