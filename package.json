@@ -1,0 +1,60 @@
+{
+  "name": "llmforge",
+  "version": "1.0.0",
+  "description": "A unified, pluggable AI runtime to run prompts across OpenAI, Gemini, Ollama, and custom models — all with a single line of code",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/esm/index.js",
+      "types": "./dist/esm/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build": "npm run build:cjs && npm run build:esm",
+    "start": "node dist/cjs/index.js",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run lint",
+    "preversion": "npm run lint",
+    "version": "npm run format && git add -A src",
+    "postversion": "git push && git push --tags"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nginH/llmforge.git"
+  },
+  "keywords": [
+    "unified",
+    "pluggable",
+    "AI",
+    "llmforge",
+    "llm",
+    "openai",
+    "gemini",
+    "ollama"
+  ],
+  "author": "Harsh",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nginH/llmforge/issues"
+  },
+  "homepage": "https://github.com/nginH/llmforge#readme",
+  "dependencies": {
+    "undici": "^7.10.0",
+    "undici-types": "^7.10.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
