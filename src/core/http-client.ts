@@ -4,134 +4,126 @@ import { request, Dispatcher } from 'undici';
 import { Readable } from 'stream';
 
 export class HttpClient {
-    private config: LLMConfig;
-    private retryHandler: RetryHandler;
+   private config: LLMConfig;
+   private retryHandler: RetryHandler;
 
-    constructor(config: LLMConfig, baseUrl: string, retryHandler?: RetryHandler) {
-        this.config = {
-            baseUrl: baseUrl, // 'https://generativelanguage.googleapis.com',
-            timeout: 30000,
-            maxRetries: 1,
-            retryDelay: 1000,
-            ...config,
-        };
-        this.retryHandler = retryHandler || new RetryHandler({
+   constructor(config: LLMConfig, baseUrl: string, retryHandler?: RetryHandler) {
+      this.config = {
+         baseUrl: baseUrl, // 'https://generativelanguage.googleapis.com',
+         timeout: 30000,
+         maxRetries: 1,
+         retryDelay: 1000,
+         ...config,
+      };
+      this.retryHandler =
+         retryHandler ||
+         new RetryHandler({
             maxRetries: this.config.maxRetries,
             retryDelay: this.config.retryDelay,
-        });
-    }
+         });
+   }
 
-    async request<T>(
-        endpoint: string,
-        options: RequestInit = {},
-        isStream: boolean = false
-    ): Promise<T> {
-        const url = `${this.config.baseUrl}${endpoint}?key=${this.config.apiKey}`;
+   async request<T>(endpoint: string, options: RequestInit = {}, isStream: boolean = false): Promise<T> {
+      const url = `${this.config.baseUrl}${endpoint}?key=${this.config.apiKey}`;
 
-        const undiciOptions: Dispatcher.RequestOptions = {
-            path: `${endpoint}?key=${this.config.apiKey}`,
-            method: (options.method as Dispatcher.HttpMethod) || 'POST',
-            headers: Object.fromEntries(
-                Object.entries({
-                    'Content-Type': 'application/json',
-                    ...options.headers,
-                }).map(([k, v]) => [k, v?.toString()])
-            ),
-            body: options.body as string | Buffer | Uint8Array | Readable | null,
-            signal: this.createTimeoutSignal(this.config.timeout!),
-        };
+      const undiciOptions: Dispatcher.RequestOptions = {
+         path: `${endpoint}?key=${this.config.apiKey}`,
+         method: (options.method as Dispatcher.HttpMethod) || 'POST',
+         headers: Object.fromEntries(
+            Object.entries({
+               'Content-Type': 'application/json',
+               ...options.headers,
+            }).map(([k, v]) => [k, v?.toString()])
+         ),
+         body: options.body as string | Buffer | Uint8Array | Readable | null,
+         signal: this.createTimeoutSignal(this.config.timeout!),
+      };
 
-        const operation = async (): Promise<T> => {
-            const { statusCode, body } = await request(url, undiciOptions);
+      const operation = async (): Promise<T> => {
+         const { statusCode, body } = await request(url, undiciOptions);
 
-            if (statusCode >= 400) {
-                await this.handleErrorResponse(statusCode, body);
-            }
+         if (statusCode >= 400) {
+            await this.handleErrorResponse(statusCode, body);
+         }
 
-            if (isStream) {
-                // For streaming, return the readable stream
-                return body as unknown as T;
-            }
+         if (isStream) {
+            // For streaming, return the readable stream
+            return body as unknown as T;
+         }
 
-            // For non-streaming, parse JSON
-            const chunks: Uint8Array[] = [];
-            for await (const chunk of body) {
-                chunks.push(chunk);
-            }
-            const responseText = Buffer.concat(chunks).toString();
-            return JSON.parse(responseText) as T;
-        };
+         // For non-streaming, parse JSON
+         const chunks: Uint8Array[] = [];
+         for await (const chunk of body) {
+            chunks.push(chunk);
+         }
+         const responseText = Buffer.concat(chunks).toString();
+         return JSON.parse(responseText) as T;
+      };
 
-        return this.retryHandler.executeWithRetry(
-            operation,
-            `${options.method || 'POST'} ${endpoint}`
-        );
-    }
+      return this.retryHandler.executeWithRetry(operation, `${options.method || 'POST'} ${endpoint}`);
+   }
 
-    async streamRequest(
-        endpoint: string,
-        options: RequestInit = {}
-    ): Promise<Readable> {
-        return this.request<Readable>(endpoint, options, true);
-    }
+   async streamRequest(endpoint: string, options: RequestInit = {}): Promise<Readable> {
+      return this.request<Readable>(endpoint, options, true);
+   }
 
-    private async handleErrorResponse(statusCode: number, body: Readable): Promise<never> {
-        let errorData: ErrorResponse;
+   private async handleErrorResponse(statusCode: number, body: Readable): Promise<never> {
+      let errorData: ErrorResponse;
 
-        try {
-            const chunks: Uint8Array[] = [];
-            for await (const chunk of body) {
-                chunks.push(chunk);
-            }
-            const responseText = Buffer.concat(chunks).toString();
-            errorData = JSON.parse(responseText);
-        } catch {
-            errorData = {
-                error: {
-                    code: statusCode,
-                    message: this.getStatusText(statusCode) || 'Unknown error',
-                    status: this.getStatusText(statusCode),
-                },
-            };
-        }
+      try {
+         const chunks: Uint8Array[] = [];
+         for await (const chunk of body) {
+            chunks.push(chunk);
+         }
+         const responseText = Buffer.concat(chunks).toString();
+         errorData = JSON.parse(responseText);
+      } catch {
+         errorData = {
+            error: {
+               code: statusCode,
+               message: this.getStatusText(statusCode) || 'Unknown error',
+               status: this.getStatusText(statusCode),
+            },
+         };
+      }
 
-        const { code, message, status, details } = errorData.error;
-        const isRetryable = this.isRetryableStatusCode(code);
-        const ErrorClass = isRetryable ? RetryableError : NonRetryableError;
-        throw new ErrorClass(message, code, status, details);
-    }
+      const { code, message, status, details } = errorData.error;
+      const isRetryable = this.isRetryableStatusCode(code);
+      const ErrorClass = isRetryable ? RetryableError : NonRetryableError;
+      throw new ErrorClass(message, code, status, details);
+   }
 
-    private isRetryableStatusCode(statusCode: number): boolean {
-        const retryableCodes = [429, 500, 502, 503, 504];
-        return retryableCodes.includes(statusCode);
-    }
+   private isRetryableStatusCode(statusCode: number): boolean {
+      const retryableCodes = [429, 500, 502, 503, 504];
+      return retryableCodes.includes(statusCode);
+   }
 
-    private getStatusText(statusCode: number): string {
-        const statusTexts: Record<number, string> = {
-            400: 'BAD_REQUEST',
-            401: 'UNAUTHORIZED',
-            403: 'FORBIDDEN',
-            404: 'NOT_FOUND',
-            429: 'RATE_LIMITED',
-            500: 'INTERNAL_SERVER_ERROR',
-            502: 'BAD_GATEWAY',
-            503: 'SERVICE_UNAVAILABLE',
-            504: 'GATEWAY_TIMEOUT',
-        };
-        return statusTexts[statusCode] || 'UNKNOWN_ERROR';
-    }
+   private getStatusText(statusCode: number): string {
+      const statusTexts: Record<number, string> = {
+         400: 'BAD_REQUEST',
+         401: 'UNAUTHORIZED',
+         403: 'FORBIDDEN',
+         404: 'NOT_FOUND',
+         429: 'RATE_LIMITED',
+         500: 'INTERNAL_SERVER_ERROR',
+         502: 'BAD_GATEWAY',
+         503: 'SERVICE_UNAVAILABLE',
+         504: 'GATEWAY_TIMEOUT',
+      };
+      return statusTexts[statusCode] || 'UNKNOWN_ERROR';
+   }
 
-    private createTimeoutSignal(timeout: number): AbortSignal {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), timeout);
-        return controller.signal;
-    }
+   private createTimeoutSignal(timeout: number): AbortSignal {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), timeout);
+      return controller.signal;
+   }
 
-    updateConfig(newConfig: Partial<LLMConfig>): void {
-        this.config = { ...this.config, ...newConfig };
-    }
+   updateConfig(newConfig: Partial<LLMConfig>): void {
+      this.config = { ...this.config, ...newConfig };
+   }
 
-    getConfig(): LLMConfig {
-        return { ...this.config };
-    }
+   getConfig(): LLMConfig {
+      return { ...this.config };
+   }
 }

@@ -1,58 +1,58 @@
 name: CI/CD
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+   push:
+      branches: [master]
+   pull_request:
+      branches: [master]
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  packages: write
+   contents: write
+   issues: write
+   pull-requests: write
+   packages: write
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          token: ${{ secrets.PAT_TOKEN }}
-      - name: Setup Node.js for npm
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.10.0'
-          registry-url: 'https://registry.npmjs.org'
-      - name: Install dependencies
-        run: npm install
-      - name: Run tests
-        run: npm test
-      - name: Run linting
-        run: npm run lint
-      - name: Build
-        run: npm run build
-      - name: Publish to npm
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: npx semantic-release
-      - name: Setup Node.js for GitHub Packages
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.10.0'
-          registry-url: 'https://npm.pkg.github.com'
-      - name: Publish to GitHub Packages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
+   build:
+      runs-on: ubuntu-latest
+      environment: prod
+      steps:
+         - uses: actions/checkout@v4
+           with:
+              fetch-depth: 0
+              persist-credentials: false
+              token: ${{ secrets.PAT_TOKEN }}
+         - name: Setup Node.js for npm
+           uses: actions/setup-node@v4
+           with:
+              node-version: '22.10.0'
+              registry-url: 'https://registry.npmjs.org'
+         - name: Install dependencies
+           run: npm install
+         - name: Run tests
+           run: npm test
+         - name: Run linting
+           run: npm run lint
+         - name: Build
+           run: npm run build
+         - name: Publish to npm
+           if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+           env:
+              NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+           run: npx semantic-release
+         - name: Setup Node.js for GitHub Packages
+           uses: actions/setup-node@v4
+           with:
+              node-version: '22.10.0'
+              registry-url: 'https://npm.pkg.github.com'
+         - name: Publish to GitHub Packages
+           if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+           env:
+              NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
+           run: |
 
-          cp package.json package.json.backup
-          npm pkg set name="@nginH/llmforge"
-          npm pkg set publishConfig.registry="https://npm.pkg.github.com"
-          npm publish --registry=https://npm.pkg.github.com
+              cp package.json package.json.backup
+              npm pkg set name="@nginH/llmforge"
+              npm pkg set publishConfig.registry="https://npm.pkg.github.com"
+              npm publish --registry=https://npm.pkg.github.com
 
-          mv package.json.backup package.json
+              mv package.json.backup package.json

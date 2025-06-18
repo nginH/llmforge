@@ -1,10 +1,4 @@
-import {
-    LLMConfig,
-    GenerateContentRequest,
-    GenerateContentResponse,
-    Tool,
-    Content,
-} from '../types';
+import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Content } from '../types';
 
 import { HttpClient } from '../core/http-client';
 import { RetryHandler } from '../strategies/retry/expo';
@@ -22,245 +16,233 @@ import { Readable } from 'stream';
     },
  */
 export class GeminiClient {
-    private httpClient: HttpClient;
-    private retryHandler: RetryHandler;
-    private streamProcessor: StreamProcessor;
-    constructor(config: LLMConfig) {
-        this.retryHandler = new RetryHandler({
-            maxRetries: config.maxRetries,
-            retryDelay: config.retryDelay,
-        });
+   private httpClient: HttpClient;
+   private retryHandler: RetryHandler;
+   private streamProcessor: StreamProcessor;
+   constructor(config: LLMConfig) {
+      this.retryHandler = new RetryHandler({
+         maxRetries: config.maxRetries,
+         retryDelay: config.retryDelay,
+      });
 
+      this.httpClient = new HttpClient(config, config.baseUrl ?? 'https://generativelanguage.googleapis.com', this.retryHandler);
+      this.streamProcessor = new StreamProcessor();
+   }
 
-        this.httpClient = new HttpClient(config, config.baseUrl ?? 'https://generativelanguage.googleapis.com', this.retryHandler);
-        this.streamProcessor = new StreamProcessor();
-    }
+   async generateContent(request: GenerateContentRequest): Promise<GenerateContentResponse> {
+      MessageValidator.validateContents(request.contents);
 
-    async generateContent(request: GenerateContentRequest): Promise<GenerateContentResponse> {
-        MessageValidator.validateContents(request.contents);
+      const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:generateContent`;
+      return this.httpClient.request<GenerateContentResponse>(endpoint, {
+         method: 'POST',
+         body: JSON.stringify(request),
+      });
+   }
 
-        const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:generateContent`;
-        return this.httpClient.request<GenerateContentResponse>(endpoint, {
-            method: 'POST',
-            body: JSON.stringify(request),
-        });
-    }
+   private convertReadableToResponse(readable: Readable): Response {
+      return new Response(readable as unknown as ReadableStream, {
+         headers: new Headers(),
+         status: 200,
+         statusText: 'OK',
+      });
+   }
 
-    private convertReadableToResponse(readable: Readable): Response {
-        return new Response(readable as unknown as ReadableStream, {
-            headers: new Headers(),
-            status: 200,
-            statusText: 'OK'
-        });
-    }
+   async generateContentStream(request: GenerateContentRequest, options?: StreamOptions): Promise<GenerateContentResponse> {
+      MessageValidator.validateContents(request.contents);
 
-    async generateContentStream(
-        request: GenerateContentRequest,
-        options?: StreamOptions
-    ): Promise<GenerateContentResponse> {
-        MessageValidator.validateContents(request.contents);
+      const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
+      const response = await this.httpClient.streamRequest(endpoint, {
+         method: 'POST',
+         body: JSON.stringify(request),
+      });
 
-        const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
-        const response = await this.httpClient.streamRequest(endpoint, {
-            method: 'POST',
-            body: JSON.stringify(request),
-        });
+      return this.streamProcessor.processStream(this.convertReadableToResponse(response), options);
+   }
 
-        return this.streamProcessor.processStream(this.convertReadableToResponse(response), options);
-    }
+   async *generateContentStreamAsync(request: GenerateContentRequest): AsyncGenerator<any> {
+      MessageValidator.validateContents(request.contents);
 
-    async* generateContentStreamAsync(request: GenerateContentRequest): AsyncGenerator<any> {
-        MessageValidator.validateContents(request.contents);
+      const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
+      const response = await this.httpClient.streamRequest(endpoint, {
+         method: 'POST',
+         body: JSON.stringify(request),
+      });
 
-        const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
-        const response = await this.httpClient.streamRequest(endpoint, {
-            method: 'POST',
-            body: JSON.stringify(request),
-        });
+      yield* this.streamProcessor.createAsyncGenerator(this.convertReadableToResponse(response));
+   }
 
-        yield* this.streamProcessor.createAsyncGenerator(this.convertReadableToResponse(response));
-    }
+   async chat(
+      message: string,
+      options: {
+         systemInstruction?: string;
+         configs?: LLMConfig;
+         tools?: Tool[];
+         sessionId?: string;
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const contents = ContentBuilder.textOnly(message);
 
+      const request: GenerateContentRequest = {
+         contents,
+         generationConfig: options.configs?.GenerationConfig,
+         tools: options.tools,
+      };
 
-    async chat(
-        message: string,
-        options: {
-            systemInstruction?: string;
-            configs?: LLMConfig;
-            tools?: Tool[];
-            sessionId?: string;
-        } = {}
-    ): Promise<GenerateContentResponse> {
-        const contents = ContentBuilder.textOnly(message);
+      if (options.systemInstruction) {
+         request.systemInstruction = {
+            parts: [{ text: options.systemInstruction }],
+         };
+      }
 
-        const request: GenerateContentRequest = {
-            contents,
-            generationConfig: options.configs?.GenerationConfig,
-            tools: options.tools,
-        };
+      const response = await this.generateContent(request);
 
-        if (options.systemInstruction) {
-            request.systemInstruction = {
-                parts: [{ text: options.systemInstruction }],
-            };
-        }
+      return response;
+   }
 
-        const response = await this.generateContent(request);
+   async chatStream(
+      message: string,
+      options: {
+         systemInstruction?: string;
+         configs?: LLMConfig;
+         tools?: Tool[];
+         sessionId?: string;
+         streamOptions?: StreamOptions;
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const contents = ContentBuilder.textOnly(message);
 
-        return response;
-    }
+      const request: GenerateContentRequest = {
+         contents,
+         generationConfig: options.configs?.GenerationConfig,
+         tools: options.tools,
+      };
 
-    async chatStream(
-        message: string,
-        options: {
-            systemInstruction?: string;
-            configs?: LLMConfig;
-            tools?: Tool[];
-            sessionId?: string;
-            streamOptions?: StreamOptions;
-        } = {}
-    ): Promise<GenerateContentResponse> {
-        const contents = ContentBuilder.textOnly(message);
+      if (options.systemInstruction) {
+         request.systemInstruction = {
+            parts: [{ text: options.systemInstruction }],
+         };
+      }
 
-        const request: GenerateContentRequest = {
-            contents,
-            generationConfig: options.configs?.GenerationConfig,
-            tools: options.tools,
-        };
+      const response = await this.generateContentStream(request, options.streamOptions);
 
-        if (options.systemInstruction) {
-            request.systemInstruction = {
-                parts: [{ text: options.systemInstruction }],
-            };
-        }
+      return response;
+   }
 
-        const response = await this.generateContentStream(request, options.streamOptions);
+   async continueConversation(
+      contents: Content[],
+      options: {
+         generationConfig?: LLMConfig['GenerationConfig'];
+         tools?: Tool[];
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const request: GenerateContentRequest = {
+         contents,
+         generationConfig: options.generationConfig,
+         tools: options.tools,
+      };
+      const response = await this.generateContent(request);
+      return response;
+   }
 
+   async analyzeImage(
+      base64Image: string,
+      mimeType: string,
+      prompt: string,
+      options: {
+         generationConfig?: LLMConfig['GenerationConfig'];
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const contents = ContentBuilder.create().addImageFromBase64(base64Image, mimeType, prompt).build();
 
-        return response;
-    }
+      return this.generateContent({
+         contents,
+         generationConfig: options.generationConfig,
+      });
+   }
 
-    async continueConversation(
-        contents: Content[],
-        options: {
-            generationConfig?: LLMConfig['GenerationConfig'];
-            tools?: Tool[];
-        } = {}
-    ): Promise<GenerateContentResponse> {
+   async analyzeDocument(
+      base64Document: string,
+      mimeType: string,
+      prompt: string,
+      options: {
+         generationConfig?: LLMConfig['GenerationConfig'];
+         useCache?: boolean;
+         cacheTtl?: string;
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const request: GenerateContentRequest = {
+         contents: ContentBuilder.create().addDocumentFromBase64(base64Document, mimeType, prompt).build(),
+         generationConfig: options.generationConfig,
+      };
 
-        const request: GenerateContentRequest = {
-            contents,
-            generationConfig: options.generationConfig,
-            tools: options.tools,
-        };
-        const response = await this.generateContent(request);
-        return response;
-    }
+      return this.generateContent(request);
+   }
 
-    async analyzeImage(
-        base64Image: string,
-        mimeType: string,
-        prompt: string,
-        options: {
-            generationConfig?: LLMConfig['GenerationConfig'];
-        } = {}
-    ): Promise<GenerateContentResponse> {
-        const contents = ContentBuilder.create()
-            .addImageFromBase64(base64Image, mimeType, prompt)
-            .build();
+   // Function calling
+   async callFunction(
+      message: string,
+      tools: Tool[],
+      options: {
+         generationConfig?: LLMConfig['GenerationConfig'];
+         systemInstruction?: string;
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const request: GenerateContentRequest = {
+         contents: ContentBuilder.textOnly(message),
+         tools,
+         generationConfig: options.generationConfig,
+      };
 
-        return this.generateContent({
-            contents,
-            generationConfig: options.generationConfig,
-        });
-    }
+      if (options.systemInstruction) {
+         request.systemInstruction = {
+            parts: [{ text: options.systemInstruction }],
+         };
+      }
 
-    async analyzeDocument(
-        base64Document: string,
-        mimeType: string,
-        prompt: string,
-        options: {
-            generationConfig?: LLMConfig['GenerationConfig'];
-            useCache?: boolean;
-            cacheTtl?: string;
-        } = {}
-    ): Promise<GenerateContentResponse> {
-        const request: GenerateContentRequest = {
-            contents: ContentBuilder.create()
-                .addDocumentFromBase64(base64Document, mimeType, prompt)
-                .build(),
-            generationConfig: options.generationConfig,
-        };
+      return this.generateContent(request);
+   }
 
-        return this.generateContent(request);
-    }
-
-    // Function calling
-    async callFunction(
-        message: string,
-        tools: Tool[],
-        options: {
-            generationConfig?: LLMConfig['GenerationConfig'];
-            systemInstruction?: string;
-        } = {}
-    ): Promise<GenerateContentResponse> {
-        const request: GenerateContentRequest = {
-            contents: ContentBuilder.textOnly(message),
-            tools,
-            generationConfig: options.generationConfig,
-        };
-
-        if (options.systemInstruction) {
-            request.systemInstruction = {
-                parts: [{ text: options.systemInstruction }],
-            };
-        }
-
-        return this.generateContent(request);
-    }
-
-    // Thinking mode
-    async generateWithThinking(
-        message: string,
-        thinkingBudget: number = -1, // -1 for dynamic thinking
-        options: {
-            systemInstruction?: string;
-            onThinking?: (thinking: string) => void;
-        } = {}
-    ): Promise<GenerateContentResponse> {
-        const request: GenerateContentRequest = {
-            contents: ContentBuilder.textOnly(message),
-            generationConfig: {
-                thinkingConfig: {
-                    thinkingBudget,
-                },
+   // Thinking mode
+   async generateWithThinking(
+      message: string,
+      thinkingBudget: number = -1, // -1 for dynamic thinking
+      options: {
+         systemInstruction?: string;
+         onThinking?: (thinking: string) => void;
+      } = {}
+   ): Promise<GenerateContentResponse> {
+      const request: GenerateContentRequest = {
+         contents: ContentBuilder.textOnly(message),
+         generationConfig: {
+            thinkingConfig: {
+               thinkingBudget,
             },
-        };
+         },
+      };
 
-        if (options.systemInstruction) {
-            request.systemInstruction = {
-                parts: [{ text: options.systemInstruction }],
-            };
-        }
+      if (options.systemInstruction) {
+         request.systemInstruction = {
+            parts: [{ text: options.systemInstruction }],
+         };
+      }
 
-        return this.generateContentStream(request, {
-            onThinking: options.onThinking,
-        });
-    }
+      return this.generateContentStream(request, {
+         onThinking: options.onThinking,
+      });
+   }
 
+   get stream(): StreamProcessor {
+      return this.streamProcessor;
+   }
 
-    get stream(): StreamProcessor {
-        return this.streamProcessor;
-    }
+   // Configuration methods
+   updateConfig(newConfig: Partial<LLMConfig>): void {
+      this.httpClient.updateConfig(newConfig);
+   }
 
-    // Configuration methods
-    updateConfig(newConfig: Partial<LLMConfig>): void {
-        this.httpClient.updateConfig(newConfig);
-    }
-
-    getConfig(): LLMConfig {
-        return this.httpClient.getConfig();
-    }
+   getConfig(): LLMConfig {
+      return this.httpClient.getConfig();
+   }
 }
 
 export * from '../types';
