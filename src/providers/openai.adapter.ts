@@ -1,4 +1,4 @@
-import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Content, Candidate, TextPart, ContentPart, FunctionDeclaration } from '../types';
+import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Content, TextPart, ContentPart, FunctionDeclaration } from '../types';
 
 import { HttpClient } from '../core/http-client';
 import { RetryHandler } from '../strategies/retry/expo';
@@ -6,6 +6,7 @@ import { ContentBuilder, MessageValidator } from '../builder/ai.builder';
 import { OpenAIStreamProcessor, StreamOptions } from '../strategies/stream/openai.stream';
 import { OpenAIRequest, OpenAIResponse, OpenAIMessage } from '../types';
 import { Readable } from 'stream';
+import { logger } from '../utils/logger';
 
 export class OpenAIClient {
    private httpClient: HttpClient;
@@ -14,8 +15,8 @@ export class OpenAIClient {
 
    constructor(config: LLMConfig) {
       this.retryHandler = new RetryHandler({
-         maxRetries: config.maxRetries,
-         retryDelay: config.retryDelay,
+         maxRetries: config.retryConfig?.maxRetries ?? 1,
+         retryDelay: config.retryConfig?.retryDelay ?? 0,
       });
       this.httpClient = new HttpClient(config, config.baseUrl ?? 'https://api.openai.com', this.retryHandler);
       this.streamProcessor = new OpenAIStreamProcessor();
@@ -32,10 +33,14 @@ export class OpenAIClient {
    private convertToOpenAIRequest(request: GenerateContentRequest): OpenAIRequest {
       const openAIRequest: OpenAIRequest = {
          model: this.httpClient.getConfig().model,
-         messages: this.convertContentsToMessages(request.contents),
+         input: this.convertContentsToMessages(request.contents),
+         text: {
+            format: {
+               type: 'text',
+            },
+         },
       };
 
-      // Handle generation config
       if (request.generationConfig) {
          const config = request.generationConfig;
          if (config.temperature !== undefined) openAIRequest.temperature = config.temperature;
@@ -125,24 +130,21 @@ export class OpenAIClient {
       });
    }
 
-   // Convert OpenAI response to Gemini format
    private convertFromOpenAIResponse(response: OpenAIResponse): GenerateContentResponse {
-      const candidates: Candidate[] = response.choices.map((choice: any) => ({
-         content: {
-            role: 'model',
-            parts: [{ text: choice.message.content }],
-         },
-         finishReason: choice.finish_reason,
-         index: choice.index,
-      }));
-
+      logger.info('OpenAI Response:', JSON.stringify(response, null, 2));
+      logger.info('OpenAI Response ID:', JSON.stringify(response.output[0]?.id, null, 2) || 'N/A');
+      logger.info('OpenAI Response Output:', response.output[0]?.content[0].text || 'N/A');
       return {
-         candidates,
-         usageMetadata: response.usage
+         resp_id: response.id,
+         output: response.output[0]?.content[0].text || '',
+         status: response?.status == 'completed' ? 'success' : response?.status || 'unknown',
+         created_at: response.created_at,
+         model: response.model,
+         usage: response.usage
             ? {
-                 promptTokenCount: response.usage.prompt_tokens,
-                 candidatesTokenCount: response.usage.completion_tokens,
-                 totalTokenCount: response.usage.total_tokens,
+                 input_tokens: response.usage.input_tokens,
+                 output_tokens: response.usage.output_tokens,
+                 total_tokens: response.usage.total_tokens,
               }
             : undefined,
       };
@@ -152,23 +154,19 @@ export class OpenAIClient {
       MessageValidator.validateContents(request.contents);
 
       const openAIRequest = this.convertToOpenAIRequest(request);
-
-      // Determine endpoint based on model and features
-      let endpoint = '/v1/chat/completions';
-      if (openAIRequest.reasoning) {
-         endpoint = '/v1/responses'; // For reasoning models
-         openAIRequest.input = openAIRequest.messages;
-         delete openAIRequest.messages;
-      }
-
-      const response = await this.httpClient.request<OpenAIResponse>(endpoint, {
-         method: 'POST',
-         body: JSON.stringify(openAIRequest),
-         headers: {
-            Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
-            'Content-Type': 'application/json',
+      logger.info('OpenAI Request:', JSON.stringify(openAIRequest, null, 2));
+      const response = await this.httpClient.request<OpenAIResponse>(
+         {
+            method: 'POST',
+            body: JSON.stringify(openAIRequest),
+            headers: {
+               Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
+               'Content-Type': 'application/json',
+            },
          },
-      });
+         false,
+         `/v1/responses`
+      );
 
       return this.convertFromOpenAIResponse(response);
    }
@@ -178,14 +176,7 @@ export class OpenAIClient {
 
       const openAIRequest = { ...this.convertToOpenAIRequest(request), stream: true };
 
-      let endpoint = '/v1/chat/completions';
-      if (openAIRequest.reasoning) {
-         endpoint = '/v1/responses';
-         openAIRequest.input = openAIRequest.messages;
-         delete openAIRequest.messages;
-      }
-
-      const response = await this.httpClient.streamRequest(endpoint, {
+      const response = await this.httpClient.streamRequest(this.httpClient.getConfig().baseUrl ?? 'https://api.openai.com/v1/responses', {
          method: 'POST',
          body: JSON.stringify(openAIRequest),
          headers: {
@@ -202,14 +193,7 @@ export class OpenAIClient {
 
       const openAIRequest = { ...this.convertToOpenAIRequest(request), stream: true };
 
-      let endpoint = '/v1/chat/completions';
-      if (openAIRequest.reasoning) {
-         endpoint = '/v1/responses';
-         openAIRequest.input = openAIRequest.messages;
-         delete openAIRequest.messages;
-      }
-
-      const response = await this.httpClient.streamRequest(endpoint, {
+      const response = await this.httpClient.streamRequest(this.httpClient.getConfig().baseUrl ?? 'https://api.openai.com/v1/responses', {
          method: 'POST',
          body: JSON.stringify(openAIRequest),
          headers: {
@@ -225,7 +209,7 @@ export class OpenAIClient {
       message: string,
       options: {
          systemInstruction?: string;
-         generationConfig?: LLMConfig['GenerationConfig'];
+         generationConfig?: LLMConfig['generationConfig'];
          tools?: Tool[];
          sessionId?: string;
       } = {}
@@ -251,7 +235,7 @@ export class OpenAIClient {
       message: string,
       options: {
          systemInstruction?: string;
-         generationConfig?: LLMConfig['GenerationConfig'];
+         generationConfig?: LLMConfig['generationConfig'];
          tools?: Tool[];
          sessionId?: string;
          streamOptions?: StreamOptions;
@@ -277,7 +261,7 @@ export class OpenAIClient {
    async continueConversation(
       contents: Content[],
       options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
+         generationConfig?: LLMConfig['generationConfig'];
          tools?: Tool[];
       } = {}
    ): Promise<GenerateContentResponse> {
@@ -289,45 +273,11 @@ export class OpenAIClient {
       return this.generateContent(request);
    }
 
-   async analyzeImage(
-      base64Image: string,
-      mimeType: string,
-      prompt: string,
-      options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
-      } = {}
-   ): Promise<GenerateContentResponse> {
-      const contents = ContentBuilder.create().addImageFromBase64(base64Image, mimeType, prompt).build();
-
-      return this.generateContent({
-         contents,
-         generationConfig: options.generationConfig,
-      });
-   }
-
-   async analyzeDocument(
-      base64Document: string,
-      mimeType: string,
-      prompt: string,
-      options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
-         useCache?: boolean;
-         cacheTtl?: string;
-      } = {}
-   ): Promise<GenerateContentResponse> {
-      const request: GenerateContentRequest = {
-         contents: ContentBuilder.create().addDocumentFromBase64(base64Document, mimeType, prompt).build(),
-         generationConfig: options.generationConfig,
-      };
-
-      return this.generateContent(request);
-   }
-
    async callFunction(
       message: string,
       tools: Tool[],
       options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
+         generationConfig?: LLMConfig['generationConfig'];
          systemInstruction?: string;
       } = {}
    ): Promise<GenerateContentResponse> {
@@ -366,14 +316,12 @@ export class OpenAIClient {
          },
       };
 
-      // Override effort if provided
       if (options.effort) {
          request.generationConfig!.thinkingConfig = {
             thinkingBudget: options.effort === 'high' ? 2000 : options.effort === 'low' ? 100 : 1000,
          };
       }
 
-      // Add JSON schema if provided
       if (options.jsonSchema) {
          request.generationConfig!.responseMimeType = 'application/json';
       }
@@ -389,23 +337,19 @@ export class OpenAIClient {
       });
    }
 
-   // OpenAI-specific method for handling the exact curl request format
    async handleOpenAIRequest(openAIRequest: OpenAIRequest): Promise<OpenAIResponse> {
-      let endpoint = '/v1/chat/completions';
-
-      // Handle reasoning endpoint
-      if (openAIRequest.reasoning || openAIRequest.input) {
-         endpoint = '/v1/responses';
-      }
-
-      return this.httpClient.request<OpenAIResponse>(endpoint, {
-         method: 'POST',
-         body: JSON.stringify(openAIRequest),
-         headers: {
-            Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
-            'Content-Type': 'application/json',
+      return this.httpClient.request<OpenAIResponse>(
+         {
+            method: 'POST',
+            body: JSON.stringify(openAIRequest),
+            headers: {
+               Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
+               'Content-Type': 'application/json',
+            },
          },
-      });
+         false,
+         `/v1/responses`
+      );
    }
 
    get stream(): OpenAIStreamProcessor {
@@ -420,101 +364,3 @@ export class OpenAIClient {
       return this.httpClient.getConfig();
    }
 }
-
-//   // Usage example for the exact curl request:
-//   export class OpenAIRequestHandler {
-//     private client: OpenAIClient;
-
-//     constructor(config: LLMConfig) {
-//       this.client = new OpenAIClient(config);
-//     }
-
-//     async handleCurlRequest(): Promise<OpenAIResponse> {
-//       const request: OpenAIRequest = {
-//         model: "o4-mini",
-//         input: [
-//           {
-//             role: "user",
-//             content: [
-//               {
-//                 type: "input_text",
-//                 text: "hii there"
-//               }
-//             ]
-//           },
-//           {
-//             role: "assistant",
-//             content: [
-//               {
-//                 type: "output_text",
-//                 text: "Hello! How can I help you today?"
-//               }
-//             ]
-//           },
-//           {
-//             role: "user",
-//             content: [
-//               {
-//                 type: "input_text",
-//                 text: "what can you help with"
-//               }
-//             ]
-//           },
-//           {
-//             role: "assistant",
-//             content: [
-//               {
-//                 type: "output_text",
-//                 text: "I can help with a wide range of tasks..."
-//               }
-//             ]
-//           },
-//           {
-//             role: "user",
-//             content: [
-//               {
-//                 type: "input_text",
-//                 text: "hii there"
-//               }
-//             ]
-//           }
-//         ],
-//         text: {
-//           format: {
-//             type: "json_schema",
-//             name: "thinking_output",
-//             strict: true,
-//             schema: {
-//               type: "object",
-//               properties: {
-//                 thinking: {
-//                   type: "string",
-//                   description: "Description of the thought process or reasoning."
-//                 },
-//                 final_output: {
-//                   type: "string",
-//                   description: "Final result or conclusion derived from the thinking process."
-//                 }
-//               },
-//               required: ["thinking", "final_output"],
-//               additionalProperties: false
-//             }
-//           }
-//         },
-//         reasoning: {
-//           effort: "medium"
-//         },
-//         tools: [],
-//         store: true
-//       };
-
-//       return this.client.handleOpenAIRequest(request);
-//     }
-//   }
-
-//   export * from '../types';
-//   export * from '../strategies/retry/expo';
-//   export * from '../core/http-client';
-//   export * from '../builder/ai.builder';
-//   export * from '../strategies/stream/openai.stream';
-//   export { OpenAIRequest, OpenAIResponse, OpenAIMessage } from './openai-types';

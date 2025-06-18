@@ -1,3 +1,4 @@
+import { logger } from '../../utils/logger';
 import { StreamChunk, GenerateContentResponse, Candidate, ContentPart } from '../../types';
 
 export interface StreamOptions {
@@ -17,9 +18,7 @@ export class StreamProcessor {
 
       const reader = response.body.getReader();
       let buffer = '';
-      let aggregatedResponse: GenerateContentResponse = {
-         candidates: [],
-      };
+      let aggregatedResponse: GenerateContentResponse & { candidates: Candidate[] } = { candidates: [] };
 
       try {
          while (true) {
@@ -54,7 +53,7 @@ export class StreamProcessor {
                         }
                      }
                   } catch (error) {
-                     console.warn('Failed to parse stream chunk:', line, error);
+                     logger.warn('Failed to parse stream chunk:', line, error);
                   }
                }
             }
@@ -71,7 +70,7 @@ export class StreamProcessor {
                   }
                }
             } catch (error) {
-               console.warn('Failed to parse final chunk:', buffer, error);
+               logger.warn('Failed to parse final chunk:', buffer, error);
             }
          }
 
@@ -79,7 +78,8 @@ export class StreamProcessor {
             options.onComplete(aggregatedResponse);
          }
 
-         return aggregatedResponse;
+         // Remove candidates property if not part of original GenerateContentResponse
+         return { ...aggregatedResponse };
       } catch (error) {
          if (options.onError) {
             options.onError(error as Error);
@@ -124,16 +124,11 @@ export class StreamProcessor {
       }
       return null;
    }
-
-   private aggregateChunk(aggregated: GenerateContentResponse, chunk: StreamChunk): void {
+   private aggregateChunk(aggregated: GenerateContentResponse & { candidates: Candidate[] }, chunk: StreamChunk): void {
       if (!chunk.candidates) return;
 
       for (let i = 0; i < chunk.candidates.length; i++) {
          const candidate = chunk.candidates[i];
-
-         if (!aggregated.candidates) {
-            aggregated.candidates = [];
-         }
 
          if (!aggregated.candidates[i]) {
             aggregated.candidates[i] = {

@@ -2,12 +2,18 @@ import { LLMConfig } from '../types';
 export class Factory {
    constructor(private readonly config: LLMConfig) {}
    async create() {
-      const supportedModels = ['openai', 'google'];
-      const modelName = this.config.model.toLowerCase();
-      if (!supportedModels.includes(modelName)) {
-         throw new Error(`Model '${modelName}' is not supported. Supported models are: ${supportedModels.join(', ')}`);
+      const supportedProviders = ['openai', 'google'];
+      const providerName = this.config.provider.toLowerCase() as 'openai' | 'google';
+      if (!supportedProviders.includes(providerName)) {
+         throw new Error(`Provider '${providerName}' is not supported. Supported providers are: ${supportedProviders.join(', ')}`);
       }
-      const { [`${modelName}Client`]: Client } = await import(`./${modelName}.adapter`);
+      const classMap: Record<'openai' | 'google', string> = {
+         openai: 'OpenAIClient',
+         google: 'GeminiClient',
+      };
+      const className = classMap[providerName];
+      const module = await import(`./${providerName}.adapter`);
+      const Client = module[className];
       return new Client(this.config);
    }
 }

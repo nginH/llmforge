@@ -25,4 +25,13 @@ coverage/
 
 # Temporary files
 *.log
-*.tmp 
+*.tmp
+*.tgz
+# Miscellaneous
+*.bak
+*.orig
+# Operating system files
+Thumbs.db
+# Logs
+logs/
+*/log

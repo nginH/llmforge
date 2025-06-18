@@ -1,3 +1,4 @@
+import { logger } from '../../utils/logger';
 import { RetryConfig, RetryableError, NonRetryableError } from '../../types';
 
 export class RetryHandler {
@@ -15,28 +16,27 @@ export class RetryHandler {
    async executeWithRetry<T>(operation: () => Promise<T>, context: string = 'operation'): Promise<T> {
       let lastError: Error;
 
-      for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      for (let attempt = 0; attempt <= (this.config?.maxRetries ?? 1); attempt++) {
          try {
             const result = await operation();
             if (attempt > 0) {
-               console.log(`${context} succeeded on attempt ${attempt + 1}`);
+               logger.info(`${context} succeeded on attempt ${attempt + 1}`);
             }
             return result;
          } catch (error) {
             lastError = error as Error;
 
-            if (attempt === this.config.maxRetries) {
-               console.error(`${context} failed after ${this.config.maxRetries + 1} attempts:`, lastError);
+            if (attempt === this.config?.maxRetries) {
+               logger.error(`${context} failed after ${this.config?.maxRetries + 1} attempts:`, lastError);
                break;
             }
 
             if (!this.isRetryableError(error)) {
-               console.error(`${context} failed with non-retryable error:`, lastError);
                throw error;
             }
 
             const delay = this.calculateDelay(attempt);
-            console.warn(`${context} failed on attempt ${attempt + 1}, retrying in ${delay}ms:`, lastError.message);
+            logger.warn(`${context} failed on attempt ${attempt + 1}, retrying in ${delay}ms:`, lastError.message);
 
             await this.sleep(delay);
          }
@@ -66,7 +66,7 @@ export class RetryHandler {
       // Check for HTTP status codes
       if (error.status || error.code) {
          const statusCode = error.status || error.code;
-         return this.config.retryableStatusCodes.includes(statusCode);
+         return this.config?.retryableStatusCodes?.includes(statusCode) ? true : false;
       }
 
       // Default to non-retryable for unknown errors
@@ -74,10 +74,10 @@ export class RetryHandler {
    }
 
    private calculateDelay(attempt: number): number {
-      if (!this.config.exponentialBackoff) {
-         return this.config.retryDelay;
+      if (!this.config?.exponentialBackoff) {
+         return this.config?.retryDelay ?? 1000; // Default to a fixed delay if exponential backoff is not enabled
       }
-      const baseDelay = this.config.retryDelay * Math.pow(2, attempt);
+      const baseDelay = this.config?.retryDelay ?? 1000 * Math.pow(2, attempt);
       const jitter = Math.random() * 0.1 * baseDelay;
       return Math.floor(baseDelay + jitter);
    }

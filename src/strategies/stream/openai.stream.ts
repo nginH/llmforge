@@ -1,3 +1,4 @@
+import { logger } from '../../utils/logger';
 import { StreamChunk, GenerateContentResponse } from '../../types';
 
 export interface StreamOptions {
@@ -48,9 +49,9 @@ export class OpenAIStreamProcessor {
 
       const reader = response.body.getReader();
       let buffer = '';
-      let aggregatedResponse: GenerateContentResponse = {
-         candidates: [],
-      };
+      let aggregatedResponse = {
+         candidates: [] as any[],
+      } as GenerateContentResponse & { candidates: any[] };
 
       try {
          while (true) {
@@ -94,7 +95,7 @@ export class OpenAIStreamProcessor {
                         }
                      }
                   } catch (error) {
-                     console.warn('Failed to parse stream chunk:', line, error);
+                     logger.warn('Failed to parse stream chunk:', line, error);
                   }
                }
             }
@@ -112,7 +113,7 @@ export class OpenAIStreamProcessor {
                   }
                }
             } catch (error) {
-               console.warn('Failed to parse final chunk:', buffer, error);
+               logger.warn('Failed to parse final chunk:', buffer, error);
             }
          }
 
@@ -227,21 +228,24 @@ export class OpenAIStreamProcessor {
    private aggregateChunk(aggregated: GenerateContentResponse, chunk: StreamChunk): void {
       if (!chunk.candidates) return;
 
+      // Ensure aggregated has candidates property
+      const agg = aggregated as { candidates: any[] };
+
       for (let i = 0; i < chunk.candidates.length; i++) {
          const candidate = chunk.candidates[i];
 
-         if (!aggregated.candidates) {
-            aggregated.candidates = [];
+         if (!agg.candidates) {
+            agg.candidates = [];
          }
 
-         if (!aggregated.candidates[i]) {
-            aggregated.candidates[i] = {
+         if (!agg.candidates[i]) {
+            agg.candidates[i] = {
                content: { parts: [] },
                index: i,
             };
          }
 
-         const aggregatedCandidate = aggregated.candidates[i];
+         const aggregatedCandidate = agg.candidates[i];
 
          // Merge content parts
          if (candidate.content?.parts) {
@@ -316,7 +320,6 @@ export class OpenAIStreamProcessor {
       }
    }
 
-   // OpenAI-specific method to handle raw OpenAI chunks without conversion
    async *createOpenAIAsyncGenerator(response: Response): AsyncGenerator<OpenAIStreamChunk> {
       if (!response.body) {
          throw new Error('Response body is empty');
@@ -356,10 +359,4 @@ export class OpenAIStreamProcessor {
          reader.releaseLock();
       }
    }
-}
-
-// Legacy compatibility - extend the original StreamProcessor
-export class StreamProcessor extends OpenAIStreamProcessor {
-   // Keep the original methods for backward compatibility
-   // The parent class handles both OpenAI and original formats
 }

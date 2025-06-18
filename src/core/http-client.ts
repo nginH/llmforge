@@ -1,7 +1,8 @@
-import { LLMConfig, ErrorResponse, GeminiError, RetryableError, NonRetryableError } from '../types';
+import { LLMConfig, ErrorResponse, RetryableError, NonRetryableError } from '../types';
 import { RetryHandler } from '../strategies/retry/expo';
 import { request, Dispatcher } from 'undici';
 import { Readable } from 'stream';
+import { logger } from '../utils/logger';
 
 export class HttpClient {
    private config: LLMConfig;
@@ -11,23 +12,22 @@ export class HttpClient {
       this.config = {
          baseUrl: baseUrl, // 'https://generativelanguage.googleapis.com',
          timeout: 30000,
-         maxRetries: 1,
-         retryDelay: 1000,
          ...config,
       };
       this.retryHandler =
          retryHandler ||
          new RetryHandler({
-            maxRetries: this.config.maxRetries,
-            retryDelay: this.config.retryDelay,
+            maxRetries: this.config.retryConfig?.maxRetries,
+            retryDelay: this.config.retryConfig?.retryDelay,
          });
    }
 
-   async request<T>(endpoint: string, options: RequestInit = {}, isStream: boolean = false): Promise<T> {
-      const url = `${this.config.baseUrl}${endpoint}?key=${this.config.apiKey}`;
+   async request<T>(options: RequestInit = {}, isStream: boolean = false, endPointPath: string): Promise<T> {
+      const url = `${this.config.baseUrl}`;
+      logger.info('base url:', url);
 
       const undiciOptions: Dispatcher.RequestOptions = {
-         path: `${endpoint}?key=${this.config.apiKey}`,
+         path: endPointPath,
          method: (options.method as Dispatcher.HttpMethod) || 'POST',
          headers: Object.fromEntries(
             Object.entries({
@@ -39,19 +39,18 @@ export class HttpClient {
          signal: this.createTimeoutSignal(this.config.timeout!),
       };
 
+      logger.debug('header body of the request ', JSON.stringify(undiciOptions, null, 2));
       const operation = async (): Promise<T> => {
          const { statusCode, body } = await request(url, undiciOptions);
-
+         logger.debug('status and body after request: ', statusCode, body);
          if (statusCode >= 400) {
             await this.handleErrorResponse(statusCode, body);
          }
 
          if (isStream) {
-            // For streaming, return the readable stream
             return body as unknown as T;
          }
 
-         // For non-streaming, parse JSON
          const chunks: Uint8Array[] = [];
          for await (const chunk of body) {
             chunks.push(chunk);
@@ -60,11 +59,11 @@ export class HttpClient {
          return JSON.parse(responseText) as T;
       };
 
-      return this.retryHandler.executeWithRetry(operation, `${options.method || 'POST'} ${endpoint}`);
+      return this.retryHandler.executeWithRetry(operation, `${options.method || 'POST'} `);
    }
 
    async streamRequest(endpoint: string, options: RequestInit = {}): Promise<Readable> {
-      return this.request<Readable>(endpoint, options, true);
+      return this.request<Readable>(options, true, endpoint);
    }
 
    private async handleErrorResponse(statusCode: number, body: Readable): Promise<never> {

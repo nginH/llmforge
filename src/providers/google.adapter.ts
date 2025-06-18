@@ -1,4 +1,4 @@
-import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Content } from '../types';
+import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Content, GeminiResponse } from '../types';
 
 import { HttpClient } from '../core/http-client';
 import { RetryHandler } from '../strategies/retry/expo';
@@ -21,22 +21,41 @@ export class GeminiClient {
    private streamProcessor: StreamProcessor;
    constructor(config: LLMConfig) {
       this.retryHandler = new RetryHandler({
-         maxRetries: config.maxRetries,
-         retryDelay: config.retryDelay,
+         maxRetries: config.retryConfig?.maxRetries ?? 3,
+         retryDelay: config.retryConfig?.retryDelay ?? 1000,
       });
 
       this.httpClient = new HttpClient(config, config.baseUrl ?? 'https://generativelanguage.googleapis.com', this.retryHandler);
       this.streamProcessor = new StreamProcessor();
    }
 
+   private convertFromGeminiResponse(response: GeminiResponse): GenerateContentResponse {
+      return {
+         resp_id: response.responseId,
+         model: response.modelVersion,
+         output: response.candidates[0]?.content.parts.map(part => ('text' in part ? part.text : '')).join('') || '',
+         usage: {
+            input_tokens: response.usageMetadata?.promptTokenCount,
+            output_tokens: response.usageMetadata?.candidatesTokenCount,
+            total_tokens: response.usageMetadata?.totalTokenCount,
+         },
+         status: 'success',
+      };
+   }
+
    async generateContent(request: GenerateContentRequest): Promise<GenerateContentResponse> {
       MessageValidator.validateContents(request.contents);
+      const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:generateContent?key=${this.httpClient.getConfig().apiKey}`;
+      const data = await this.httpClient.request<GeminiResponse>(
+         {
+            method: 'POST',
+            body: JSON.stringify(request),
+         },
+         false,
+         endpoint
+      );
 
-      const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:generateContent`;
-      return this.httpClient.request<GenerateContentResponse>(endpoint, {
-         method: 'POST',
-         body: JSON.stringify(request),
-      });
+      return this.convertFromGeminiResponse(data);
    }
 
    private convertReadableToResponse(readable: Readable): Response {
@@ -49,7 +68,7 @@ export class GeminiClient {
 
    async generateContentStream(request: GenerateContentRequest, options?: StreamOptions): Promise<GenerateContentResponse> {
       MessageValidator.validateContents(request.contents);
-
+      const nae = '';
       const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
       const response = await this.httpClient.streamRequest(endpoint, {
          method: 'POST',
@@ -84,7 +103,7 @@ export class GeminiClient {
 
       const request: GenerateContentRequest = {
          contents,
-         generationConfig: options.configs?.GenerationConfig,
+         generationConfig: options.configs?.generationConfig,
          tools: options.tools,
       };
 
@@ -113,7 +132,7 @@ export class GeminiClient {
 
       const request: GenerateContentRequest = {
          contents,
-         generationConfig: options.configs?.GenerationConfig,
+         generationConfig: options.configs?.generationConfig,
          tools: options.tools,
       };
 
@@ -131,7 +150,7 @@ export class GeminiClient {
    async continueConversation(
       contents: Content[],
       options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
+         generationConfig?: LLMConfig['generationConfig'];
          tools?: Tool[];
       } = {}
    ): Promise<GenerateContentResponse> {
@@ -144,46 +163,11 @@ export class GeminiClient {
       return response;
    }
 
-   async analyzeImage(
-      base64Image: string,
-      mimeType: string,
-      prompt: string,
-      options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
-      } = {}
-   ): Promise<GenerateContentResponse> {
-      const contents = ContentBuilder.create().addImageFromBase64(base64Image, mimeType, prompt).build();
-
-      return this.generateContent({
-         contents,
-         generationConfig: options.generationConfig,
-      });
-   }
-
-   async analyzeDocument(
-      base64Document: string,
-      mimeType: string,
-      prompt: string,
-      options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
-         useCache?: boolean;
-         cacheTtl?: string;
-      } = {}
-   ): Promise<GenerateContentResponse> {
-      const request: GenerateContentRequest = {
-         contents: ContentBuilder.create().addDocumentFromBase64(base64Document, mimeType, prompt).build(),
-         generationConfig: options.generationConfig,
-      };
-
-      return this.generateContent(request);
-   }
-
-   // Function calling
    async callFunction(
       message: string,
       tools: Tool[],
       options: {
-         generationConfig?: LLMConfig['GenerationConfig'];
+         generationConfig?: LLMConfig['generationConfig'];
          systemInstruction?: string;
       } = {}
    ): Promise<GenerateContentResponse> {
@@ -234,8 +218,6 @@ export class GeminiClient {
    get stream(): StreamProcessor {
       return this.streamProcessor;
    }
-
-   // Configuration methods
    updateConfig(newConfig: Partial<LLMConfig>): void {
       this.httpClient.updateConfig(newConfig);
    }

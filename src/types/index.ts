@@ -1,23 +1,26 @@
 export interface LLMConfig {
    apiKey: string; // API key for authentication
+   provider: string; // provider name, e.g., 'openai', 'google'
    model: string;
    baseUrl?: string;
    timeout?: number;
-   maxRetries?: number; // maximum number of retries for failed requests
-   retryDelay?: number; // in milliseconds
-   GenerationConfig?: GenerationConfig;
-   priorty?: number; // lower number means higher priority
+   retryConfig?: RetryConfig; // configuration for retrying requests
+   generationConfig?: GenerationConfig;
+   priority?: number; // lower number means higher priority
+   stream?: boolean; //enabling stream;
+   asyncStream?: boolean;
 }
 
 export interface Config {
    llmConfig: LLMConfig | LLMConfig[];
    enableFallback: boolean; // set to true to use fallback mechanism if the primary LLM fails as per the priority
+   enableLogging?: boolean; // set to true to enable logging of requests and responses
 }
 export interface RetryConfig {
-   maxRetries: number;
-   retryDelay: number;
-   exponentialBackoff: boolean;
-   retryableStatusCodes: number[];
+   maxRetries?: number;
+   retryDelay?: number;
+   exponentialBackoff?: boolean;
+   retryableStatusCodes?: number[];
 }
 
 export interface ThinkingConfig {
@@ -102,13 +105,23 @@ export interface Candidate {
 }
 
 export interface GenerateContentResponse {
-   candidates?: Candidate[];
-   promptFeedback?: any;
+   resp_id?: string;
+   output?: string; // The important field: output text from the model
+   created_at?: number;
+   model?: string;
+   usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      total_tokens?: number;
+   };
+   status?: string;
    usageMetadata?: {
-      promptTokenCount?: number;
-      candidatesTokenCount?: number;
       totalTokenCount?: number;
    };
+   fallback?: {
+      isUsed: boolean; // Indicates if fallback was used
+      reason?: string; // Reason for fallback usage
+   } | null;
 }
 
 export interface StreamChunk {
@@ -167,47 +180,25 @@ export interface OpenAIMessage {
         }>;
 }
 
-export interface OpenAIRequest {
-   model: string;
-   input?: OpenAIMessage[];
-   messages?: OpenAIMessage[];
-   text?: {
-      format?: {
-         type: 'json_schema';
-         name: string;
-         strict: boolean;
-         schema: any;
-      };
-   };
-   reasoning?: {
-      effort: 'low' | 'medium' | 'high';
-   };
-   tools?: any[];
-   store?: boolean;
-   temperature?: number;
-   max_tokens?: number;
-   top_p?: number;
-   frequency_penalty?: number;
-   presence_penalty?: number;
-   stop?: string[];
-}
-
 export interface OpenAIResponse {
    id: string;
    object: string;
-   created: number;
+   created_at: number;
+   status: string;
    model: string;
-   choices: Array<{
-      index: number;
-      message: {
-         role: string;
-         content: string;
-      };
+   output: Array<{
+      id: number;
+      role: string;
+      completed: string;
+      content: Array<{
+         type: string;
+         text: string;
+      }>;
       finish_reason: string;
    }>;
    usage?: {
-      prompt_tokens: number;
-      completion_tokens: number;
+      input_tokens: number;
+      output_tokens: number;
       total_tokens: number;
    };
 }
@@ -229,10 +220,10 @@ export interface OpenAIRequest {
    messages?: OpenAIMessage[];
    text?: {
       format?: {
-         type: 'json_schema';
-         name: string;
-         strict: boolean;
-         schema: any;
+         type: 'text' | 'json_schema';
+         name?: string;
+         strict?: boolean;
+         schema?: any;
       };
    };
    reasoning?: {
@@ -248,22 +239,16 @@ export interface OpenAIRequest {
    stop?: string[];
 }
 
-export interface OpenAIResponse {
-   id: string;
-   object: string;
-   created: number;
-   model: string;
-   choices: Array<{
-      index: number;
-      message: {
-         role: string;
-         content: string;
-      };
-      finish_reason: string;
+export interface GeminiResponse {
+   candidates: Array<{
+      content: Content;
+      finishReason?: string;
    }>;
-   usage?: {
-      prompt_tokens: number;
-      completion_tokens: number;
-      total_tokens: number;
+   usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
    };
+   modelVersion?: string;
+   responseId?: string;
 }

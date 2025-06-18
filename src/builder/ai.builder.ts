@@ -1,4 +1,4 @@
-import { Content, ContentPart } from '../types';
+import { Content } from '../types';
 
 export class ContentBuilder {
    private contents: Content[] = [];
@@ -12,60 +12,6 @@ export class ContentBuilder {
          role,
          parts: [{ text }],
       });
-      return this;
-   }
-
-   addImageFromBase64(base64Data: string, mimeType: string, text?: string, role: 'user' | 'model' = 'user'): ContentBuilder {
-      const parts: ContentPart[] = [
-         {
-            inline_data: {
-               mime_type: mimeType,
-               data: base64Data,
-            },
-         },
-      ];
-
-      if (text) {
-         parts.push({ text });
-      }
-
-      this.contents.push({ role, parts });
-      return this;
-   }
-
-   addImageFromFile(fileUri: string, mimeType: string, text?: string, role: 'user' | 'model' = 'user'): ContentBuilder {
-      const parts: ContentPart[] = [
-         {
-            file_data: {
-               mime_type: mimeType,
-               file_uri: fileUri,
-            },
-         },
-      ];
-
-      if (text) {
-         parts.push({ text });
-      }
-
-      this.contents.push({ role, parts });
-      return this;
-   }
-
-   addDocumentFromBase64(base64Data: string, mimeType: string, text?: string, role: 'user' | 'model' = 'user'): ContentBuilder {
-      const parts: ContentPart[] = [
-         {
-            inline_data: {
-               mime_type: mimeType,
-               data: base64Data,
-            },
-         },
-      ];
-
-      if (text) {
-         parts.push({ text });
-      }
-
-      this.contents.push({ role, parts });
       return this;
    }
 
