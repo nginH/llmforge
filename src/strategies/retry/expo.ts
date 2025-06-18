@@ -17,7 +17,7 @@ export class RetryHandler {
     context: string = 'operation'
   ): Promise<T> {
     let lastError: Error;
-    
+
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
         const result = await operation();
@@ -27,7 +27,7 @@ export class RetryHandler {
         return result;
       } catch (error) {
         lastError = error as Error;
-        
+
         if (attempt === this.config.maxRetries) {
           console.error(`${context} failed after ${this.config.maxRetries + 1} attempts:`, lastError);
           break;
@@ -40,7 +40,7 @@ export class RetryHandler {
 
         const delay = this.calculateDelay(attempt);
         console.warn(`${context} failed on attempt ${attempt + 1}, retrying in ${delay}ms:`, lastError.message);
-        
+
         await this.sleep(delay);
       }
     }
@@ -53,17 +53,17 @@ export class RetryHandler {
     if (error instanceof NonRetryableError) {
       return false;
     }
-    
+
     if (error instanceof RetryableError) {
       return true;
     }
 
-    // Check for network errors
+
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       return true;
     }
 
-    // Check for timeout errors
+
     if (error.name === 'AbortError' || error.message.includes('timeout')) {
       return true;
     }

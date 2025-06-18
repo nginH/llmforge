@@ -1,14 +1,18 @@
-// types.ts
-export interface Config {
-    apiKey: string;
+export interface LLMConfig {
+    apiKey: string;// API key for authentication
     model: string;
     baseUrl?: string;
     timeout?: number;
-    maxRetries?: number;
-    retryDelay?: number;
+    maxRetries?: number;// maximum number of retries for failed requests
+    retryDelay?: number; // in milliseconds
     GenerationConfig?: GenerationConfig;
+    priorty?: number; // lower number means higher priority
 }
 
+export interface Config {
+    llmConfig: LLMConfig | LLMConfig[];
+    enableFallback: boolean; // set to true to use fallback mechanism if the primary LLM fails as per the priority
+}
 export interface RetryConfig {
     maxRetries: number;
     retryDelay: number;
@@ -215,25 +219,25 @@ export interface OpenAIResponse {
 export interface OpenAIMessage {
     role: 'system' | 'user' | 'assistant';
     content: string | Array<{
-      type: 'text' | 'input_text' | 'output_text';
-      text: string;
+        type: 'text' | 'input_text' | 'output_text';
+        text: string;
     }>;
-  }
-  
-  export interface OpenAIRequest {
+}
+
+export interface OpenAIRequest {
     model: string;
     input?: OpenAIMessage[];
     messages?: OpenAIMessage[];
     text?: {
-      format?: {
-        type: 'json_schema';
-        name: string;
-        strict: boolean;
-        schema: any;
-      };
+        format?: {
+            type: 'json_schema';
+            name: string;
+            strict: boolean;
+            schema: any;
+        };
     };
     reasoning?: {
-      effort: 'low' | 'medium' | 'high';
+        effort: 'low' | 'medium' | 'high';
     };
     tools?: any[];
     store?: boolean;
@@ -243,25 +247,24 @@ export interface OpenAIMessage {
     frequency_penalty?: number;
     presence_penalty?: number;
     stop?: string[];
-  }
-  
-  export interface OpenAIResponse {
+}
+
+export interface OpenAIResponse {
     id: string;
     object: string;
     created: number;
     model: string;
     choices: Array<{
-      index: number;
-      message: {
-        role: string;
-        content: string;
-      };
-      finish_reason: string;
+        index: number;
+        message: {
+            role: string;
+            content: string;
+        };
+        finish_reason: string;
     }>;
     usage?: {
-      prompt_tokens: number;
-      completion_tokens: number;
-      total_tokens: number;
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
     };
-  }
-  
+}

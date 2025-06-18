@@ -1,5 +1,5 @@
 import {
-  Config,
+  LLMConfig,
   GenerateContentRequest,
   GenerateContentResponse,
   Tool,
@@ -22,7 +22,7 @@ export class OpenAIClient {
   private retryHandler: RetryHandler;
   private streamProcessor: OpenAIStreamProcessor;
 
-  constructor(config: Config) {
+  constructor(config: LLMConfig) {
     this.retryHandler = new RetryHandler({
       maxRetries: config.maxRetries,
       retryDelay: config.retryDelay,
@@ -114,7 +114,6 @@ export class OpenAIClient {
           if ('text' in part) {
             return part.text;
           }
-          // Handle other part types if needed
           return '';
         }).join('\n')
       };
@@ -239,7 +238,7 @@ export class OpenAIClient {
     message: string,
     options: {
       systemInstruction?: string;
-      generationConfig?: Config['GenerationConfig'];
+      generationConfig?: LLMConfig['GenerationConfig'];
       tools?: Tool[];
       sessionId?: string;
     } = {}
@@ -265,7 +264,7 @@ export class OpenAIClient {
     message: string,
     options: {
       systemInstruction?: string;
-      generationConfig?:Config['GenerationConfig'];
+      generationConfig?:LLMConfig['GenerationConfig'];
       tools?: Tool[];
       sessionId?: string;
       streamOptions?: StreamOptions;
@@ -291,7 +290,7 @@ export class OpenAIClient {
   async continueConversation(
     contents: Content[],
     options: {
-      generationConfig?:Config['GenerationConfig'];
+      generationConfig?:LLMConfig['GenerationConfig'];
       tools?: Tool[];
     } = {}
   ): Promise<GenerateContentResponse> {
@@ -308,7 +307,7 @@ export class OpenAIClient {
     mimeType: string,
     prompt: string,
     options: {
-      generationConfig?:Config['GenerationConfig'];
+      generationConfig?:LLMConfig['GenerationConfig'];
     } = {}
   ): Promise<GenerateContentResponse> {
     const contents = ContentBuilder.create()
@@ -326,7 +325,7 @@ export class OpenAIClient {
     mimeType: string,
     prompt: string,
     options: {
-      generationConfig?: Config['GenerationConfig'];
+      generationConfig?: LLMConfig['GenerationConfig'];
       useCache?: boolean;
       cacheTtl?: string;
     } = {}
@@ -345,7 +344,7 @@ export class OpenAIClient {
     message: string,
     tools: Tool[],
     options: {
-      generationConfig?:Config['GenerationConfig'];
+      generationConfig?:LLMConfig['GenerationConfig'];
       systemInstruction?: string;
     } = {}
   ): Promise<GenerateContentResponse> {
@@ -430,11 +429,11 @@ export class OpenAIClient {
     return this.streamProcessor;
   }
 
-  updateConfig(newConfig: Partial<Config>): void {
+  updateConfig(newConfig: Partial<LLMConfig>): void {
     this.httpClient.updateConfig(newConfig);
   }
 
-  getConfig(): Config {
+  getConfig(): LLMConfig {
     return this.httpClient.getConfig();
   }
 }
@@ -443,7 +442,7 @@ export class OpenAIClient {
 //   export class OpenAIRequestHandler {
 //     private client: OpenAIClient;
   
-//     constructor(config: Config) {
+//     constructor(config: LLMConfig) {
 //       this.client = new OpenAIClient(config);
 //     }
   

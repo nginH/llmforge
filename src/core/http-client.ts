@@ -1,14 +1,13 @@
-// http-client.ts
-import { Config, ErrorResponse, GeminiError, RetryableError, NonRetryableError } from '../types';
+import { LLMConfig, ErrorResponse, GeminiError, RetryableError, NonRetryableError } from '../types';
 import { RetryHandler } from '../strategies/retry/expo';
 import { request, Dispatcher } from 'undici';
 import { Readable } from 'stream';
 
 export class HttpClient {
-    private config: Config;
+    private config: LLMConfig;
     private retryHandler: RetryHandler;
 
-    constructor(config: Config, baseUrl: string, retryHandler?: RetryHandler) {
+    constructor(config: LLMConfig, baseUrl: string, retryHandler?: RetryHandler) {
         this.config = {
             baseUrl: baseUrl, // 'https://generativelanguage.googleapis.com',
             timeout: 30000,
@@ -29,7 +28,6 @@ export class HttpClient {
     ): Promise<T> {
         const url = `${this.config.baseUrl}${endpoint}?key=${this.config.apiKey}`;
 
-        // Convert RequestInit to undici's RequestOptions
         const undiciOptions: Dispatcher.RequestOptions = {
             path: `${endpoint}?key=${this.config.apiKey}`,
             method: (options.method as Dispatcher.HttpMethod) || 'POST',
@@ -129,11 +127,11 @@ export class HttpClient {
         return controller.signal;
     }
 
-    updateConfig(newConfig: Partial<Config>): void {
+    updateConfig(newConfig: Partial<LLMConfig>): void {
         this.config = { ...this.config, ...newConfig };
     }
 
-    getConfig(): Config {
+    getConfig(): LLMConfig {
         return { ...this.config };
     }
 }
