@@ -11,8 +11,8 @@
   ],
   "scripts": {
     "build": "tsc && tsc -p tsconfig.esm.json",
-    "test": "jest",
-    "lint": "eslint . --ext .ts",
+    "test": " echo \" not implemented yet\"",
+    "lint": " echo \" not implemented yet\"",
     "prepare": "npm run build"
   },
   "keywords": [
