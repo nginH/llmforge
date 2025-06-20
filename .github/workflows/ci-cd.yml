@@ -14,7 +14,13 @@ jobs:
    build:
       runs-on: ubuntu-latest
       environment: prod
+      
       steps:
+         - name: copy Env file
+           run: 
+               echo "${{ secrets.ENV }}"   >> ./.env
+               echo "NODE_ENV=development" >> ./.env
+
          - uses: actions/checkout@v4
            with:
               fetch-depth: 0
