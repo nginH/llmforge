@@ -1,4 +1,3 @@
-import { Braces } from 'lucide-react';
 import { streamResponse, streamResponseComplete } from '../../../src/index';
 
 interface ChatCompletionChunk {
