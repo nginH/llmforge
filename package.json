@@ -1,6 +1,6 @@
 {
    "name": "llmforge",
-   "version": "2.0.0",
+   "version": "1.0.0",
    "description": "One API, every AI model, instant switching. Change from GPT-4 to Gemini to local models with a single config update. LLMForge is the lightweight, TypeScript-first solution for multi-provider AI applications with zero vendor lock-in.",
    "main": "dist/index.js",
    "module": "dist/index.mjs",
