@@ -66,6 +66,7 @@ export class OpenAIStreamProcessor {
 
             for (const line of lines) {
                if (line.trim()) {
+                  logger.info('Raw API stream line:', line);
                   try {
                      const openAIChunk = this.parseOpenAIStreamChunk(line);
                      if (openAIChunk) {
@@ -84,8 +85,6 @@ export class OpenAIStreamProcessor {
                               options.onThinking(thinking);
                            }
                         }
-
-                        // Convert to Gemini format and aggregate
                         const geminiChunk = this.convertToGeminiChunk(openAIChunk);
                         this.aggregateChunk(aggregatedResponse, geminiChunk);
 
@@ -278,7 +277,7 @@ export class OpenAIStreamProcessor {
       }
    }
 
-   async *createAsyncGenerator(response: Response): AsyncGenerator<StreamChunk> {
+   async *createAsyncGenerator(response: Response): AsyncGenerator<any> {
       if (!response.body) {
          throw new Error('Response body is empty');
       }
@@ -299,21 +298,59 @@ export class OpenAIStreamProcessor {
 
             for (const line of lines) {
                if (line.trim()) {
-                  const openAIChunk = this.parseOpenAIStreamChunk(line);
-                  if (openAIChunk) {
-                     const geminiChunk = this.convertToGeminiChunk(openAIChunk);
-                     yield geminiChunk;
+                  // logger.info('Raw API stream line:', line);
+                  // Remove event: ... lines, only process data: ...
+                  if (line.startsWith('data:')) {
+                     const dataStr = line.replace(/^data:\s*/, '');
+                     let dataObj;
+                     try {
+                        dataObj = JSON.parse(dataStr);
+                     } catch {
+                        continue;
+                     }
+                     // Handle delta tokens
+                     if (dataObj.type === 'response.output_text.delta' && dataObj.delta) {
+                        yield {
+                           type: 'delta',
+                           token: dataObj.delta,
+                        };
+                     }
+                     // Handle final completion
+                     if (dataObj.type === 'response.output_text.done' && dataObj.text) {
+                        yield {
+                           type: 'done',
+                           token: '',
+                           completeOutput: dataObj.text,
+                           thinkingOutput: '',
+                           model: dataObj.model || '',
+                           usage: undefined,
+                           status: dataObj.status || '',
+                           usageMetadata: undefined,
+                        };
+                     }
+
+                     if (dataObj.type === 'response.completed') {
+                        yield {
+                           type: 'completed',
+                           token: '',
+                           completeOutput: dataObj?.response?.output[0]?.content[0].text,
+                           thinkingOutput: '',
+                           model: dataObj.response.model || '',
+                           usage: {
+                              input_tokens: dataObj.response.usage.input_tokens,
+                              output_tokens: dataObj.response.usage.output_tokens,
+                              total_tokens: dataObj.response.usage.total_tokens,
+                           },
+                           status: dataObj.status || '',
+                        };
+                     }
                   }
                }
             }
          }
 
          if (buffer.trim()) {
-            const openAIChunk = this.parseOpenAIStreamChunk(buffer);
-            if (openAIChunk) {
-               const geminiChunk = this.convertToGeminiChunk(openAIChunk);
-               yield geminiChunk;
-            }
+            // Optionally handle any remaining buffer
          }
       } finally {
          reader.releaseLock();

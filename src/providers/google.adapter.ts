@@ -3,8 +3,9 @@ import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Conte
 import { HttpClient } from '../core/http-client';
 import { RetryHandler } from '../strategies/retry/expo';
 import { ContentBuilder, MessageValidator } from '../builder/ai.builder';
-import { StreamProcessor, StreamOptions } from '../strategies/stream/google.stream';
+import { GoogleStreamProcessor, StreamOptions } from '../strategies/stream/google.stream';
 import { Readable } from 'stream';
+import { logger } from '../utils/logger';
 /**
  * 
  * "generationConfig": {
@@ -18,15 +19,16 @@ import { Readable } from 'stream';
 export class GeminiClient {
    private httpClient: HttpClient;
    private retryHandler: RetryHandler;
-   private streamProcessor: StreamProcessor;
+   private streamProcessor: GoogleStreamProcessor;
+   private endpoint: string = 'https://generativelanguage.googleapis.com';
    constructor(config: LLMConfig) {
       this.retryHandler = new RetryHandler({
          maxRetries: config.retryConfig?.maxRetries ?? 3,
          retryDelay: config.retryConfig?.retryDelay ?? 1000,
       });
 
-      this.httpClient = new HttpClient(config, config.baseUrl ?? 'https://generativelanguage.googleapis.com', this.retryHandler);
-      this.streamProcessor = new StreamProcessor();
+      this.httpClient = new HttpClient(config, config.baseUrl ?? this.endpoint, this.retryHandler);
+      this.streamProcessor = new GoogleStreamProcessor();
    }
 
    private convertFromGeminiResponse(response: GeminiResponse): GenerateContentResponse {
@@ -68,26 +70,37 @@ export class GeminiClient {
 
    async generateContentStream(request: GenerateContentRequest, options?: StreamOptions): Promise<GenerateContentResponse> {
       MessageValidator.validateContents(request.contents);
-      const nae = '';
       const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
-      const response = await this.httpClient.streamRequest(endpoint, {
-         method: 'POST',
-         body: JSON.stringify(request),
-      });
+      const response = await this.httpClient.streamRequest(
+         {
+            method: 'POST',
+            body: JSON.stringify(request),
+         },
+         endpoint
+      );
 
       return this.streamProcessor.processStream(this.convertReadableToResponse(response), options);
    }
 
    async *generateContentStreamAsync(request: GenerateContentRequest): AsyncGenerator<any> {
-      MessageValidator.validateContents(request.contents);
+      logger.info('Generating content stream asynchronously');
+      try {
+         MessageValidator.validateContents(request.contents);
 
-      const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent`;
-      const response = await this.httpClient.streamRequest(endpoint, {
-         method: 'POST',
-         body: JSON.stringify(request),
-      });
+         const endpoint = `/v1beta/models/${this.httpClient.getConfig().model}:streamGenerateContent?key=${this.httpClient.getConfig().apiKey}`;
+         const response = await this.httpClient.streamRequest(
+            {
+               method: 'POST',
+               body: JSON.stringify(request),
+            },
+            endpoint
+         );
 
-      yield* this.streamProcessor.createAsyncGenerator(this.convertReadableToResponse(response));
+         yield* this.streamProcessor.createAsyncGenerator(this.convertReadableToResponse(response));
+      } catch (error) {
+         logger.error('Error in generateContentStreamAsync:', error);
+         throw error;
+      }
    }
 
    async chat(
@@ -215,7 +228,7 @@ export class GeminiClient {
       });
    }
 
-   get stream(): StreamProcessor {
+   get stream(): GoogleStreamProcessor {
       return this.streamProcessor;
    }
    updateConfig(newConfig: Partial<LLMConfig>): void {

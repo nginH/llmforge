@@ -8,7 +8,6 @@ export interface LLMConfig {
    generationConfig?: GenerationConfig;
    priority?: number; // lower number means higher priority
    stream?: boolean; //enabling stream;
-   asyncStream?: boolean;
 }
 
 export interface Config {
@@ -214,6 +213,16 @@ export interface OpenAIMessage {
         }>;
 }
 
+export interface AiRoleOmitModelToAssistant {
+   role: 'system' | 'user' | 'assistant';
+   content:
+      | string
+      | Array<{
+           type: 'text' | 'input_text' | 'output_text';
+           text: string;
+        }>;
+}
+
 export interface OpenAIRequest {
    model: string;
    input?: OpenAIMessage[];
@@ -251,4 +260,38 @@ export interface GeminiResponse {
    };
    modelVersion?: string;
    responseId?: string;
+}
+
+export interface GroqChatCompletionResponse {
+   id: string;
+   object: 'chat.completion';
+   created: number;
+   model: string;
+   choices: GroqChoice[];
+   usage: GroqUsage;
+   usage_breakdown: null | Record<string, unknown>;
+   system_fingerprint: string;
+   x_groq: {
+      id: string;
+   };
+}
+
+export interface GroqChoice {
+   index: number;
+   message: {
+      role: 'assistant' | 'user' | 'system';
+      content: string;
+   };
+   logprobs: null | any; // Use appropriate type if logprobs is detailed in docs
+   finish_reason: string;
+}
+
+export interface GroqUsage {
+   queue_time: number;
+   prompt_tokens: number;
+   prompt_time: number;
+   completion_tokens: number;
+   completion_time: number;
+   total_tokens: number;
+   total_time: number;
 }

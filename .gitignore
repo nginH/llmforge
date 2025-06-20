@@ -35,3 +35,7 @@ Thumbs.db
 # Logs
 logs/
 */log
+
+internalfun.js
+model.log.json
+.llmforge/
