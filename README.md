@@ -13,38 +13,38 @@ A unified, pluggable AI runtime to run prompts across OpenAI, Gemini, Groq, and 
 ## 📋 Table of Contents
 
 - [LLMForge 🔥](#llmforge-)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [✨ Features](#-features)
-  - [🚀 Quick Start](#-quick-start)
-  - [📦 Installation](#-installation)
-  - [🔗 Supported Providers \& Models](#-supported-providers--models)
-  - [⚡ Streaming Responses](#-streaming-responses)
-  - [⚙️ Configuration](#️-configuration)
-    - [Single Provider](#single-provider)
-    - [Multiple Providers with Fallback](#multiple-providers-with-fallback)
-  - [📝 Message \& Response Format](#-message--response-format)
-    - [Message Format](#message-format)
-    - [Response Format (Non-Streaming)](#response-format-non-streaming)
-    - [Response Format (Streaming)](#response-format-streaming)
-      - [Delta Chunk](#delta-chunk)
-      - [Completed Chunk](#completed-chunk)
-      - [Example Usage](#example-usage)
-  - [💡 Examples](#-examples)
-    - [Basic OpenAI Usage](#basic-openai-usage)
-    - [Basic Gemini Usage](#basic-gemini-usage)
-    - [Basic Groq Usage](#basic-groq-usage)
-  - [📚 API Reference](#-api-reference)
-    - [`RunnerClient`](#runnerclient)
-      - [`RunnerClient.create(config)`](#runnerclientcreateconfig)
-      - [`client.run(messages)`](#clientrunmessages)
-    - [Configuration Options](#configuration-options)
-      - [`llmConfig` Object](#llmconfig-object)
-      - [`generationConfig`](#generationconfig)
-      - [`retryConfig`](#retryconfig)
-  - [🔑 Environment Variables](#-environment-variables)
-  - [🗺️ Roadmap](#️-roadmap)
-  - [🤝 Contributing](#-contributing)
-  - [❤️ Support](#️-support)
+   - [📋 Table of Contents](#-table-of-contents)
+   - [✨ Features](#-features)
+   - [🚀 Quick Start](#-quick-start)
+   - [📦 Installation](#-installation)
+   - [🔗 Supported Providers \& Models](#-supported-providers--models)
+   - [⚡ Streaming Responses](#-streaming-responses)
+   - [⚙️ Configuration](#️-configuration)
+      - [Single Provider](#single-provider)
+      - [Multiple Providers with Fallback](#multiple-providers-with-fallback)
+   - [📝 Message \& Response Format](#-message--response-format)
+      - [Message Format](#message-format)
+      - [Response Format (Non-Streaming)](#response-format-non-streaming)
+      - [Response Format (Streaming)](#response-format-streaming)
+         - [Delta Chunk](#delta-chunk)
+         - [Completed Chunk](#completed-chunk)
+         - [Example Usage](#example-usage)
+   - [💡 Examples](#-examples)
+      - [Basic OpenAI Usage](#basic-openai-usage)
+      - [Basic Gemini Usage](#basic-gemini-usage)
+      - [Basic Groq Usage](#basic-groq-usage)
+   - [📚 API Reference](#-api-reference)
+      - [`RunnerClient`](#runnerclient)
+         - [`RunnerClient.create(config)`](#runnerclientcreateconfig)
+         - [`client.run(messages)`](#clientrunmessages)
+      - [Configuration Options](#configuration-options)
+         - [`llmConfig` Object](#llmconfig-object)
+         - [`generationConfig`](#generationconfig)
+         - [`retryConfig`](#retryconfig)
+   - [🔑 Environment Variables](#-environment-variables)
+   - [🗺️ Roadmap](#️-roadmap)
+   - [🤝 Contributing](#-contributing)
+   - [❤️ Support](#️-support)
 
 ## ✨ Features
 
@@ -510,7 +510,7 @@ console.log(response.output);
 Creates and initializes a new LLMForge client instance.
 
 - **Parameters:**
-  - `config`: The main configuration object.
+   - `config`: The main configuration object.
 - **Returns:** `Promise<RunnerClient>`
 
 #### `client.run(messages)`
@@ -518,7 +518,7 @@ Creates and initializes a new LLMForge client instance.
 Executes a prompt against the configured LLM provider(s).
 
 - **Parameters:**
-  - `messages`: An array of message objects in the unified format.
+   - `messages`: An array of message objects in the unified format.
 - **Returns:** `Promise<Response>` for non-streaming calls, or `Promise<AsyncIterable<StreamResponse>>` for streaming calls.
 
 ### Configuration Options

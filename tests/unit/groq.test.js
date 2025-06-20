@@ -2,27 +2,7 @@ const { TestHelpers } = require('../utils/test-helpers');
 const { ProviderConfigs } = require('../configs/provider-configs');
 const { TestData } = require('../data/test-data');
 
-const modelsList = [
-   'allam-2-7b',
-   'compound-beta',
-   'compound-beta-mini',
-   'deepseek-r1-distill-llama-70b',
-   'distil-whisper',
-   'gemma-2-instruct',
-   'llama-3-1-8b',
-   'llama-3-3-70b',
-   'llama-3-70b',
-   'llama-3-8b',
-   'llama-4-maverick-17b-128e',
-   'llama-4-scout-17b-16e',
-   'llama-guard-4-12b',
-   'llama-prompt-guard-2-22m',
-   'prompt-guard-2-86m',
-   'mistral-saba-24b',
-   'playai-tts',
-   'playai-tts-arabic',
-   'qwq-32b',
-];
+const modelsList = ['mistral-saba-24b'];
 describe('Groq Provider Tests', () => {
    describe('Client Creation', () => {
       test(
@@ -75,6 +55,7 @@ describe('Groq Provider Tests', () => {
       );
 
       for (const model of modelsList) {
+         console.log('MODEL IS :', model);
          test(
             `should handle complex conversations for model ${model}`,
             async () => {

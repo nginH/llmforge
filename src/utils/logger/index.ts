@@ -52,7 +52,7 @@ class Logger {
       if (!logging) return; //
       const formattedMessage = Logger.formatMessage('info', message);
       Logger.writeToFile(formattedMessage);
-      if (logging) console.log(formattedMessage);
+      console.log(formattedMessage);
    }
 
    static debug(...message: any[]): void {
@@ -66,13 +66,13 @@ class Logger {
       if (!logging) return; //
       const formattedMessage = Logger.formatMessage('error', message);
       Logger.writeToFile(formattedMessage);
-      if (logging) console.error(formattedMessage);
+      console.error(formattedMessage);
    }
 
    static warn(...message: any[]): void {
       const formattedMessage = Logger.formatMessage('warn', message);
       Logger.writeToFile(formattedMessage);
-      if (logging) console.warn(formattedMessage);
+      console.warn(formattedMessage);
    }
 }
 

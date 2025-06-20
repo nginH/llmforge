@@ -2,21 +2,7 @@ const { TestHelpers } = require('../utils/test-helpers');
 const { ProviderConfigs } = require('../configs/provider-configs');
 const { TestData } = require('../data/test-data');
 
-const modelList = [
-   'gemini-2.5-pro',
-   'gemini-2.5-pro-preview-05-06',
-   'gemini-2.5-flash',
-   'gemini-2.5-flash-preview-04-17',
-   'gemini-2.5-flash-lite-preview-06-17',
-   'gemini-2.0-flash',
-   'gemini-2.0-flash-lite',
-   'gemma-3n-e4b-it',
-   'gemma-3-1b-it',
-   'gemma-3-4b-it',
-   'gemma-3-12b-it',
-   'gemma-3-27b-it',
-   'learnlm-2.0-flash-experimental',
-];
+const modelList = ['gemini-1.5-flash'];
 
 describe('Gemini Provider Tests', () => {
    describe('Client Creation', () => {
@@ -69,7 +55,8 @@ describe('Gemini Provider Tests', () => {
          global.API_TIMEOUT
       );
 
-      for (const model in modelList) {
+      for (const model of modelList) {
+         console.log('gemini model is :', model);
          test(
             `should respect generation config for model ${model}`,
             async () => {

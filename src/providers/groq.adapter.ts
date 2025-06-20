@@ -47,6 +47,11 @@ export class GroqClient {
          `/openai/v1/chat/completions`
       );
 
+      if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+         logger.error('Groq API did not return a valid choices array. Full response:', response);
+         throw new Error(`Groq API did not return a valid choices array. Response: ${JSON.stringify(response)}`);
+      }
+
       return {
          resp_id: response.id,
          output: response.choices[0].message.content,
