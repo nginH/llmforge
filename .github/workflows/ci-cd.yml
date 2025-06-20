@@ -22,17 +22,24 @@ jobs:
               persist-credentials: false
               token: ${{ secrets.PAT_TOKEN }}
 
-         - name: copy Env file
-           run: echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> ./.env
-              echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ./.env
-              echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> ./.env
-
          - name: Fail if API keys are missing
            run: |
               if [ -z "${{ secrets.OPENAI_API_KEY }}" ] || [ -z "${{ secrets.GOOGLE_API_KEY }}" ] || [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
                 echo "One or more API keys are missing in GitHub secrets. Please set OPENAI_API_KEY, GOOGLE_API_KEY, and GROQ_API_KEY."
                 exit 1
               fi
+
+         - name: Copy Env file
+           run: |
+              echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> ./.env
+              echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ./.env
+              echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> ./.env
+
+         - name: Print .env file
+           run: cat .env
+
+         - name: Print environment variables
+           run: printenv | grep API_KEY
 
          - name: Setup Node.js for npm
            uses: actions/setup-node@v4
