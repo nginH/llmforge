@@ -16,6 +16,12 @@ jobs:
       environment: prod
       
       steps:
+         - uses: actions/checkout@v4
+           with:
+              fetch-depth: 0
+              persist-credentials: false
+              token: ${{ secrets.PAT_TOKEN }}
+              
          - name: copy Env file
            run: 
                echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> ./.env
@@ -23,11 +29,6 @@ jobs:
                echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> ./.env
                echo "NODE_ENV=development" >> ./.env
 
-         - uses: actions/checkout@v4
-           with:
-              fetch-depth: 0
-              persist-credentials: false
-              token: ${{ secrets.PAT_TOKEN }}
          - name: Setup Node.js for npm
            uses: actions/setup-node@v4
            with:
