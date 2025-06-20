@@ -3,10 +3,10 @@ import { LLMConfig, GenerateContentRequest, GenerateContentResponse, Tool, Conte
 import { HttpClient } from '../core/http-client';
 import { RetryHandler } from '../strategies/retry/expo';
 import { ContentBuilder, MessageValidator } from '../builder/ai.builder';
-import { OpenAIStreamProcessor, StreamOptions } from '../strategies/stream/openai.stream';
+import { OpenAIStreamProcessor } from '../strategies/stream/openai.stream';
 import { OpenAIRequest, OpenAIResponse, OpenAIMessage } from '../types';
-import { Readable } from 'stream';
 import { logger } from '../utils/logger';
+import { CommanMethods } from './comman';
 
 export class OpenAIClient {
    private httpClient: HttpClient;
@@ -22,18 +22,10 @@ export class OpenAIClient {
       this.streamProcessor = new OpenAIStreamProcessor();
    }
 
-   private convertReadableToResponse(readable: Readable): Response {
-      return new Response(readable as unknown as ReadableStream, {
-         headers: new Headers(),
-         status: 200,
-         statusText: 'OK',
-      });
-   }
-
    private convertToOpenAIRequest(request: GenerateContentRequest): OpenAIRequest {
       const openAIRequest: OpenAIRequest = {
          model: this.httpClient.getConfig().model,
-         input: this.convertContentsToMessages(request.contents),
+         input: CommanMethods.omitModelToAssistantInContents(request.contents),
          text: {
             format: {
                type: 'text',
@@ -96,24 +88,6 @@ export class OpenAIClient {
       return openAIRequest;
    }
 
-   private convertContentsToMessages(contents: Content[]): OpenAIMessage[] {
-      return contents.map(content => {
-         const role = content.role === 'model' ? 'assistant' : content.role || 'user';
-         const message: OpenAIMessage = {
-            role: role as 'system' | 'user' | 'assistant',
-            content: content.parts
-               .map((part: ContentPart) => {
-                  if ('text' in part) {
-                     return part.text;
-                  }
-                  return '';
-               })
-               .join('\n'),
-         };
-         return message;
-      });
-   }
-
    private convertToolsToOpenAI(tools: Tool[]): any[] {
       return tools.flatMap(tool => {
          if (tool.functionDeclarations) {
@@ -153,6 +127,7 @@ export class OpenAIClient {
    async generateContent(request: GenerateContentRequest): Promise<GenerateContentResponse> {
       MessageValidator.validateContents(request.contents);
 
+      logger.info('Static generation');
       const openAIRequest = this.convertToOpenAIRequest(request);
       logger.info('OpenAI Request:', JSON.stringify(openAIRequest, null, 2));
       const response = await this.httpClient.request<OpenAIResponse>(
@@ -171,38 +146,30 @@ export class OpenAIClient {
       return this.convertFromOpenAIResponse(response);
    }
 
-   async generateContentStream(request: GenerateContentRequest, options?: StreamOptions): Promise<GenerateContentResponse> {
-      MessageValidator.validateContents(request.contents);
-
-      const openAIRequest = { ...this.convertToOpenAIRequest(request), stream: true };
-
-      const response = await this.httpClient.streamRequest(this.httpClient.getConfig().baseUrl ?? 'https://api.openai.com/v1/responses', {
-         method: 'POST',
-         body: JSON.stringify(openAIRequest),
-         headers: {
-            Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
-            'Content-Type': 'application/json',
-         },
-      });
-
-      return this.streamProcessor.processStream(this.convertReadableToResponse(response), options);
-   }
-
    async *generateContentStreamAsync(request: GenerateContentRequest): AsyncGenerator<any> {
-      MessageValidator.validateContents(request.contents);
+      logger.info('Generating content stream asynchronously for request: %j', request);
+      try {
+         MessageValidator.validateContents(request.contents);
+         logger.info('Streaming generation (async)');
+         const openAIRequest = { ...this.convertToOpenAIRequest(request), stream: true };
 
-      const openAIRequest = { ...this.convertToOpenAIRequest(request), stream: true };
+         const response = await this.httpClient.streamRequest(
+            {
+               method: 'POST',
+               body: JSON.stringify(openAIRequest),
+               headers: {
+                  Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
+                  'Content-Type': 'application/json',
+               },
+            },
+            '/v1/responses'
+         );
 
-      const response = await this.httpClient.streamRequest(this.httpClient.getConfig().baseUrl ?? 'https://api.openai.com/v1/responses', {
-         method: 'POST',
-         body: JSON.stringify(openAIRequest),
-         headers: {
-            Authorization: `Bearer ${this.httpClient.getConfig().apiKey}`,
-            'Content-Type': 'application/json',
-         },
-      });
-
-      yield* this.streamProcessor.createAsyncGenerator(this.convertReadableToResponse(response));
+         yield* this.streamProcessor.createAsyncGenerator(CommanMethods.convertReadableToResponse(response));
+      } catch (error) {
+         console.error('Error in generateContentStreamAsync:', error);
+         throw error;
+      }
    }
 
    async chat(
@@ -229,33 +196,6 @@ export class OpenAIClient {
       }
 
       return this.generateContent(request);
-   }
-
-   async chatStream(
-      message: string,
-      options: {
-         systemInstruction?: string;
-         generationConfig?: LLMConfig['generationConfig'];
-         tools?: Tool[];
-         sessionId?: string;
-         streamOptions?: StreamOptions;
-      } = {}
-   ): Promise<GenerateContentResponse> {
-      const contents = ContentBuilder.textOnly(message);
-
-      const request: GenerateContentRequest = {
-         contents,
-         generationConfig: options.generationConfig,
-         tools: options.tools,
-      };
-
-      if (options.systemInstruction) {
-         request.systemInstruction = {
-            parts: [{ text: options.systemInstruction }],
-         };
-      }
-
-      return this.generateContentStream(request, options.streamOptions);
    }
 
    async continueConversation(
@@ -297,45 +237,45 @@ export class OpenAIClient {
    }
 
    // OpenAI-specific thinking/reasoning mode
-   async generateWithThinking(
-      message: string,
-      thinkingBudget: number = -1,
-      options: {
-         systemInstruction?: string;
-         onThinking?: (thinking: string) => void;
-         effort?: 'low' | 'medium' | 'high';
-         jsonSchema?: any;
-      } = {}
-   ): Promise<GenerateContentResponse> {
-      const request: GenerateContentRequest = {
-         contents: ContentBuilder.textOnly(message),
-         generationConfig: {
-            thinkingConfig: {
-               thinkingBudget,
-            },
-         },
-      };
+   // async generateWithThinking(
+   //    message: string,
+   //    thinkingBudget: number = -1,
+   //    options: {
+   //       systemInstruction?: string;
+   //       onThinking?: (thinking: string) => void;
+   //       effort?: 'low' | 'medium' | 'high';
+   //       jsonSchema?: any;
+   //    } = {}
+   // ): Promise<GenerateContentResponse> {
+   //    const request: GenerateContentRequest = {
+   //       contents: ContentBuilder.textOnly(message),
+   //       generationConfig: {
+   //          thinkingConfig: {
+   //             thinkingBudget,
+   //          },
+   //       },
+   //    };
 
-      if (options.effort) {
-         request.generationConfig!.thinkingConfig = {
-            thinkingBudget: options.effort === 'high' ? 2000 : options.effort === 'low' ? 100 : 1000,
-         };
-      }
+   //    if (options.effort) {
+   //       request.generationConfig!.thinkingConfig = {
+   //          thinkingBudget: options.effort === 'high' ? 2000 : options.effort === 'low' ? 100 : 1000,
+   //       };
+   //    }
 
-      if (options.jsonSchema) {
-         request.generationConfig!.responseMimeType = 'application/json';
-      }
+   //    if (options.jsonSchema) {
+   //       request.generationConfig!.responseMimeType = 'application/json';
+   //    }
 
-      if (options.systemInstruction) {
-         request.systemInstruction = {
-            parts: [{ text: options.systemInstruction }],
-         };
-      }
+   //    if (options.systemInstruction) {
+   //       request.systemInstruction = {
+   //          parts: [{ text: options.systemInstruction }],
+   //       };
+   //    }
 
-      return this.generateContentStream(request, {
-         onThinking: options.onThinking,
-      });
-   }
+   //    return this.generateContentStream(request, {
+   //       onThinking: options.onThinking,
+   //    });
+   // }
 
    async handleOpenAIRequest(openAIRequest: OpenAIRequest): Promise<OpenAIResponse> {
       return this.httpClient.request<OpenAIResponse>(

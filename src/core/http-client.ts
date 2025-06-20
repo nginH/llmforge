@@ -25,6 +25,7 @@ export class HttpClient {
    async request<T>(options: RequestInit = {}, isStream: boolean = false, endPointPath: string): Promise<T> {
       const url = `${this.config.baseUrl}`;
       logger.info('base url:', url);
+      logger.info('endpoint path: ', endPointPath);
 
       const undiciOptions: Dispatcher.RequestOptions = {
          path: endPointPath,
@@ -38,17 +39,26 @@ export class HttpClient {
          body: options.body as string | Buffer | Uint8Array | Readable | null,
          signal: this.createTimeoutSignal(this.config.timeout!),
       };
-
-      logger.debug('header body of the request ', JSON.stringify(undiciOptions, null, 2));
+      logger.info('undici options: ', JSON.stringify(undiciOptions, null, 2));
       const operation = async (): Promise<T> => {
          const { statusCode, body } = await request(url, undiciOptions);
-         logger.debug('status and body after request: ', statusCode, body);
-         if (statusCode >= 400) {
-            await this.handleErrorResponse(statusCode, body);
-         }
+
+         logger.debug('status of the response is :', statusCode);
+         //REMOVE FROM HERE
+         // const chunk2: Uint8Array[] = [];
+         // for await (const chunk of body) {
+         //    chunk2.push(chunk);
+         // }
+         // const responseText2 = Buffer.concat(chunk2).toString();
+         // console.log("response text:", JSON.parse(responseText2) as T);
+         //REMOVE TO HERE
 
          if (isStream) {
-            return body as unknown as T;
+            logger.info('streaming response');
+            if (body instanceof Readable) {
+               return body as unknown as T;
+            }
+            throw new NonRetryableError('Expected a Readable stream for streaming requests', statusCode, this.getStatusText(statusCode));
          }
 
          const chunks: Uint8Array[] = [];
@@ -62,8 +72,9 @@ export class HttpClient {
       return this.retryHandler.executeWithRetry(operation, `${options.method || 'POST'} `);
    }
 
-   async streamRequest(endpoint: string, options: RequestInit = {}): Promise<Readable> {
-      return this.request<Readable>(options, true, endpoint);
+   async streamRequest(options: RequestInit = {}, endPointPath: string): Promise<Readable> {
+      logger.info('endpoint path: ', endPointPath);
+      return this.request<Readable>(options, true, endPointPath);
    }
 
    private async handleErrorResponse(statusCode: number, body: Readable): Promise<never> {
