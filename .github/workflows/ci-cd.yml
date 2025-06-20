@@ -18,7 +18,6 @@ jobs:
       steps:
          - name: copy Env file
            run: 
-               echo "${{ secrets.ENV }}"   >> ./.env
                echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> ./.env
                echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ./.env
                echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> ./.env
